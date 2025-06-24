@@ -1,5 +1,5 @@
 <?php
-namespace lbuchs\WebAuthn;
+namespace Onetech\WebAuthn;
 
 /**
  * @author Lukas Buchs

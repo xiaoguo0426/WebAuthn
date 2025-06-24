@@ -1,9 +1,9 @@
 <?php
 
-namespace lbuchs\WebAuthn\Attestation;
-use lbuchs\WebAuthn\WebAuthnException;
-use lbuchs\WebAuthn\CBOR\CborDecoder;
-use lbuchs\WebAuthn\Binary\ByteBuffer;
+namespace Onetech\WebAuthn\Attestation;
+use Onetech\WebAuthn\WebAuthnException;
+use Onetech\WebAuthn\CBOR\CborDecoder;
+use Onetech\WebAuthn\Binary\ByteBuffer;
 
 /**
  * @author Lukas Buchs

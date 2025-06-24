@@ -1,28 +1,16 @@
 <?php
 
-namespace lbuchs\WebAuthn;
-use lbuchs\WebAuthn\Binary\ByteBuffer;
-require_once 'WebAuthnException.php';
-require_once 'Binary/ByteBuffer.php';
-require_once 'Attestation/AttestationObject.php';
-require_once 'Attestation/AuthenticatorData.php';
-require_once 'Attestation/Format/FormatBase.php';
-require_once 'Attestation/Format/None.php';
-require_once 'Attestation/Format/AndroidKey.php';
-require_once 'Attestation/Format/AndroidSafetyNet.php';
-require_once 'Attestation/Format/Apple.php';
-require_once 'Attestation/Format/Packed.php';
-require_once 'Attestation/Format/Tpm.php';
-require_once 'Attestation/Format/U2f.php';
-require_once 'CBOR/CborDecoder.php';
+namespace Onetech\WebAuthn;
+
+use Onetech\WebAuthn\Binary\ByteBuffer;
 
 /**
  * WebAuthn
  * @author Lukas Buchs
  * @license https://github.com/lbuchs/WebAuthn/blob/master/LICENSE MIT
  */
-class WebAuthn {
-    // relying party
+class WebAuthn
+{
     private $_rpName;
     private $_rpId;
     private $_rpIdHash;
@@ -39,7 +27,8 @@ class WebAuthn {
      * @param bool $useBase64UrlEncoding true to use base64 url encoding for binary data in json objects. Default is a RFC 1342-Like serialized string.
      * @throws WebAuthnException
      */
-    public function __construct($rpName, $rpId, $allowedFormats=null, $useBase64UrlEncoding=false) {
+    public function __construct($rpName, $rpId, $allowedFormats = null, $useBase64UrlEncoding = false)
+    {
         $this->_rpName = $rpName;
         $this->_rpId = $rpId;
         $this->_rpIdHash = \hash('sha256', $rpId, true);
@@ -72,7 +61,8 @@ class WebAuthn {
      * @param string $path file path of / directory with root certificates
      * @param array|null $certFileExtensions if adding a direction, all files with provided extension are added. default: pem, crt, cer, der
      */
-    public function addRootCertificates($path, $certFileExtensions=null) {
+    public function addRootCertificates($path, $certFileExtensions = null)
+    {
         if (!\is_array($this->_caFiles)) {
             $this->_caFiles = [];
         }
@@ -96,7 +86,8 @@ class WebAuthn {
      * @param array<string> $hashes
      * @return void
      */
-    public function addAndroidKeyHashes($hashes) {
+    public function addAndroidKeyHashes($hashes)
+    {
         if (!\is_array($this->_androidKeyHashes)) {
             $this->_androidKeyHashes = [];
         }
@@ -112,7 +103,8 @@ class WebAuthn {
      * Returns the generated challenge to save for later validation
      * @return ByteBuffer
      */
-    public function getChallenge() {
+    public function getChallenge()
+    {
         return $this->_challenge;
     }
 
@@ -123,7 +115,7 @@ class WebAuthn {
      * @param string $userName
      * @param string $userDisplayName
      * @param int $timeout timeout in seconds
-     * @param bool|string $requireResidentKey      'required', if the key should be stored by the authentication device
+     * @param bool|string $requireResidentKey 'required', if the key should be stored by the authentication device
      *                                             Valid values:
      *                                             true = required
      *                                             false = preferred
@@ -134,13 +126,14 @@ class WebAuthn {
      *                                             true = required
      *                                             false = preferred
      *                                             string 'required' 'preferred' 'discouraged'
-     * @param bool|null $crossPlatformAttachment   true for cross-platform devices (eg. fido usb),
-     *                                             false for platform devices (eg. windows hello, android safetynet),
+     * @param bool|null $crossPlatformAttachment true for cross-platform devices (eg. fido usb),
+     *                                             false for platform devices (e.g. windows hello, android safetynet),
      *                                             null for both
-     * @param array $excludeCredentialIds a array of ids, which are already registered, to prevent re-registration
+     * @param array $excludeCredentialIds an array of ids, which are already registered, to prevent re-registration
      * @return \stdClass
      */
-    public function getCreateArgs($userId, $userName, $userDisplayName, $timeout=20, $requireResidentKey=false, $requireUserVerification=false, $crossPlatformAttachment=null, $excludeCredentialIds=[]) {
+    public function getCreateArgs($userId, $userName, $userDisplayName, $timeout = 20, $requireResidentKey = false, $requireUserVerification = false, $crossPlatformAttachment = null, $excludeCredentialIds = [])
+    {
 
         $args = new \stdClass();
         $args->publicKey = new \stdClass();
@@ -257,7 +250,8 @@ class WebAuthn {
      *                                             string 'required' 'preferred' 'discouraged'
      * @return \stdClass
      */
-    public function getGetArgs($credentialIds=[], $timeout=20, $allowUsb=true, $allowNfc=true, $allowBle=true, $allowHybrid=true, $allowInternal=true, $requireUserVerification=false) {
+    public function getGetArgs($credentialIds = [], $timeout = 20, $allowUsb = true, $allowNfc = true, $allowBle = true, $allowHybrid = true, $allowInternal = true, $requireUserVerification = false)
+    {
 
         // validate User Verification Requirement
         if (\is_bool($requireUserVerification)) {
@@ -313,7 +307,8 @@ class WebAuthn {
      * returns null if there is no counter
      * @return ?int
      */
-    public function getSignatureCounter() {
+    public function getSignatureCounter()
+    {
         return \is_int($this->_signatureCounter) ? $this->_signatureCounter : null;
     }
 
@@ -329,7 +324,8 @@ class WebAuthn {
      * @return \stdClass
      * @throws WebAuthnException
      */
-    public function processCreate($clientDataJSON, $attestationObject, $challenge, $requireUserVerification=false, $requireUserPresent=true, $failIfRootMismatch=true, $requireCtsProfileMatch=true) {
+    public function processCreate($clientDataJSON, $attestationObject, $challenge, $requireUserVerification = false, $requireUserPresent = true, $failIfRootMismatch = true, $requireCtsProfileMatch = true)
+    {
         $clientDataHash = \hash('sha256', $clientDataJSON, true);
         $clientData = \json_decode($clientDataJSON);
         $challenge = $challenge instanceof ByteBuffer ? $challenge : new ByteBuffer($challenge);
@@ -373,7 +369,7 @@ class WebAuthn {
         // Android-SafetyNet: if required, check for Compatibility Testing Suite (CTS).
         if ($requireCtsProfileMatch && $attestationObject->getAttestationFormat() instanceof Attestation\Format\AndroidSafetyNet) {
             if (!$attestationObject->getAttestationFormat()->ctsProfileMatch()) {
-                 throw new WebAuthnException('invalid ctsProfileMatch: device is not approved as a Google-certified Android device.', WebAuthnException::ANDROID_NOT_TRUSTED);
+                throw new WebAuthnException('invalid ctsProfileMatch: device is not approved as a Google-certified Android device.', WebAuthnException::ANDROID_NOT_TRUSTED);
             }
         }
 
@@ -415,7 +411,7 @@ class WebAuthn {
         $data->rootValid = $rootValid;
         $data->userPresent = $userPresent;
         $data->userVerified = $userVerified;
-    	$data->isBackupEligible = $attestationObject->getAuthenticatorData()->getIsBackupEligible();
+        $data->isBackupEligible = $attestationObject->getAuthenticatorData()->getIsBackupEligible();
         $data->isBackedUp = $attestationObject->getAuthenticatorData()->getIsBackup();
         return $data;
     }
@@ -427,14 +423,15 @@ class WebAuthn {
      * @param string $authenticatorData binary from browser
      * @param string $signature binary from browser
      * @param string $credentialPublicKey string PEM-formated public key from used credentialId
-     * @param string|ByteBuffer $challenge  binary from used challange
+     * @param string|ByteBuffer $challenge binary from used challange
      * @param int $prevSignatureCnt signature count value of the last login
      * @param bool $requireUserVerification true, if the device must verify user (e.g. by biometric data or pin)
      * @param bool $requireUserPresent true, if the device must check user presence (e.g. by pressing a button)
      * @return boolean true if get is successful
      * @throws WebAuthnException
      */
-    public function processGet($clientDataJSON, $authenticatorData, $signature, $credentialPublicKey, $challenge, $prevSignatureCnt=null, $requireUserVerification=false, $requireUserPresent=true) {
+    public function processGet($clientDataJSON, $authenticatorData, $signature, $credentialPublicKey, $challenge, $prevSignatureCnt = null, $requireUserVerification = false, $requireUserPresent = true)
+    {
         $authenticatorObj = new Attestation\AuthenticatorData($authenticatorData);
         $clientDataHash = \hash('sha256', $clientDataJSON, true);
         $clientData = \json_decode($clientDataJSON);
@@ -531,7 +528,8 @@ class WebAuthn {
      * @return int number of cetificates
      * @throws WebAuthnException
      */
-    public function queryFidoMetaDataService($certFolder, $deleteCerts=true) {
+    public function queryFidoMetaDataService($certFolder, $deleteCerts = true)
+    {
         $url = 'https://mds.fidoalliance.org/';
         $raw = null;
         if (\function_exists('curl_init')) {
@@ -584,7 +582,7 @@ class WebAuthn {
 
                         // create filename
                         $certFilename = \preg_replace('/[^a-z0-9]/i', '_', $description);
-                        $certFilename = \trim(\preg_replace('/\_{2,}/i', '_', $certFilename),'_') . '.pem';
+                        $certFilename = \trim(\preg_replace('/_{2,}/i', '_', $certFilename), '_') . '.pem';
                         $certFilename = \strtolower($certFilename);
 
                         // add certificate
@@ -618,9 +616,9 @@ class WebAuthn {
      * checks if the origin matchs the RP ID
      * @param string $origin
      * @return boolean
-     * @throws WebAuthnException
      */
-    private function _checkOrigin($origin) {
+    private function _checkOrigin($origin)
+    {
         if (str_starts_with($origin, 'android:apk-key-hash:')) {
             return $this->_checkAndroidKeyHashes($origin);
         }
@@ -646,7 +644,8 @@ class WebAuthn {
      * @param string $origin
      * @return boolean
      */
-    private function _checkAndroidKeyHashes($origin) {
+    private function _checkAndroidKeyHashes($origin)
+    {
         $parts = explode('android:apk-key-hash:', $origin);
         if (count($parts) !== 2) {
             return false;
@@ -657,10 +656,11 @@ class WebAuthn {
     /**
      * generates a new challange
      * @param int $length
-     * @return string
+     * @return ByteBuffer
      * @throws WebAuthnException
      */
-    private function _createChallenge($length = 32) {
+    private function _createChallenge($length = 32)
+    {
         if (!$this->_challenge) {
             $this->_challenge = ByteBuffer::randomBuffer($length);
         }
@@ -673,13 +673,15 @@ class WebAuthn {
      * @param string $signature
      * @param string $credentialPublicKey PEM format
      * @return bool
+     * @throws WebAuthnException
      */
-    private function _verifySignature($dataToVerify, $signature, $credentialPublicKey) {
+    private function _verifySignature($dataToVerify, $signature, $credentialPublicKey)
+    {
 
-        // Use Sodium to verify EdDSA 25519 as its not yet supported by openssl
+        // Use Sodium to verify EdDSA 25519 as It's not yet supported by openssl
         if (\function_exists('sodium_crypto_sign_verify_detached') && !\in_array('ed25519', \openssl_get_curve_names(), true)) {
             $pkParts = [];
-            if (\preg_match('/BEGIN PUBLIC KEY\-+(?:\s|\n|\r)+([^\-]+)(?:\s|\n|\r)*\-+END PUBLIC KEY/i', $credentialPublicKey, $pkParts)) {
+            if (\preg_match('/BEGIN PUBLIC KEY-+(?:\s|\n|\r)+([^\-]+)(?:\s|\n|\r)*-+END PUBLIC KEY/i', $credentialPublicKey, $pkParts)) {
                 $rawPk = \base64_decode($pkParts[1]);
 
                 // 30        = der sequence
@@ -695,9 +697,8 @@ class WebAuthn {
                 // [...]     = 32 byte x-curve
                 $okpPrefix = "\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00";
 
-                if ($rawPk && \strlen($rawPk) === 44 && \substr($rawPk,0, \strlen($okpPrefix)) === $okpPrefix) {
+                if ($rawPk && \strlen($rawPk) === 44 && str_starts_with($rawPk, $okpPrefix)) {
                     $publicKeyXCurve = \substr($rawPk, \strlen($okpPrefix));
-
                     return \sodium_crypto_sign_verify_detached($signature, $dataToVerify, $publicKeyXCurve);
                 }
             }
