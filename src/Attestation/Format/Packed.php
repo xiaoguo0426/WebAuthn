@@ -11,7 +11,7 @@ class Packed extends FormatBase
 {
     private mixed $_alg;
     private string $_signature;
-    private string $_x5c;
+    private ?string $_x5c = null;
 
     /**
      * @throws WebAuthnException
@@ -150,4 +150,3 @@ class Packed extends FormatBase
         return \openssl_verify($dataToVerify, $this->_signature, $publicKey, OPENSSL_ALGO_SHA256) === 1;
     }
 }
-
