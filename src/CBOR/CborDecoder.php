@@ -22,11 +22,11 @@ class CborDecoder {
     const CBOR_MAJOR_BYTE_STRING = 2;
 
     /**
-     * @param ByteBuffer|string $bufOrBin
+     * @param string|ByteBuffer $bufOrBin
      * @return mixed
      * @throws WebAuthnException
      */
-    public static function decode($bufOrBin) {
+    public static function decode(ByteBuffer|string $bufOrBin) {
         $buf = $bufOrBin instanceof ByteBuffer ? $bufOrBin : new ByteBuffer($bufOrBin);
 
         $offset = 0;
@@ -38,12 +38,12 @@ class CborDecoder {
     }
 
     /**
-     * @param ByteBuffer|string $bufOrBin
+     * @param string|ByteBuffer $bufOrBin
      * @param int $startOffset
-     * @param int|null $endOffset
+     * @param int $endOffset
      * @return mixed
      */
-    public static function decodeInPlace($bufOrBin, $startOffset, &$endOffset = null) {
+    public static function decodeInPlace(ByteBuffer|string $bufOrBin, int $startOffset, int &$endOffset) {
         $buf = $bufOrBin instanceof ByteBuffer ? $bufOrBin : new ByteBuffer($bufOrBin);
 
         $offset = $startOffset;
@@ -61,7 +61,7 @@ class CborDecoder {
      * @param int $offset
      * @return mixed
      */
-    protected static function _parseItem(ByteBuffer $buf, &$offset) {
+    protected static function _parseItem(ByteBuffer $buf, int &$offset) {
         $first = $buf->getByteVal($offset++);
         $type = $first >> 5;
         $val = $first & 0b11111;
@@ -75,6 +75,9 @@ class CborDecoder {
         return self::_parseItemData($type, $val, $buf, $offset);
     }
 
+    /**
+     * @throws WebAuthnException
+     */
     protected static function _parseFloatSimple($val, ByteBuffer $buf, &$offset) {
         switch ($val) {
             case 24:
@@ -111,10 +114,11 @@ class CborDecoder {
 
     /**
      * @param int $val
-     * @return mixed
+     * @return bool|null
      * @throws WebAuthnException
      */
-    protected static function _parseSimple($val) {
+    protected static function _parseSimple(int $val): ?bool
+    {
         if ($val === 20) {
             return false;
         }
@@ -127,6 +131,9 @@ class CborDecoder {
         throw new WebAuthnException(sprintf('Unsupported simple value %d.', $val), WebAuthnException::CBOR);
     }
 
+    /**
+     * @throws WebAuthnException
+     */
     protected static function _parseExtraLength($val, ByteBuffer $buf, &$offset) {
         switch ($val) {
             case 24:
@@ -161,6 +168,13 @@ class CborDecoder {
         return $val;
     }
 
+    /**
+     * @param $type
+     * @param $val
+     * @param ByteBuffer $buf
+     * @param $offset
+     * @throws WebAuthnException
+     */
     protected static function _parseItemData($type, $val, ByteBuffer $buf, &$offset) {
         switch ($type) {
             case self::CBOR_MAJOR_UNSIGNED_INT: // uint
@@ -193,7 +207,11 @@ class CborDecoder {
         throw new WebAuthnException(sprintf('Unknown major type %d.', $type), WebAuthnException::CBOR);
     }
 
-    protected static function _parseMap(ByteBuffer $buf, &$offset, $count) {
+    /**
+     * @throws WebAuthnException
+     */
+    protected static function _parseMap(ByteBuffer $buf, &$offset, $count): array
+    {
         $map = array();
 
         for ($i = 0; $i < $count; $i++) {
@@ -209,7 +227,14 @@ class CborDecoder {
         return $map;
     }
 
-    protected static function _parseArray(ByteBuffer $buf, &$offset, $count) {
+    /**
+     * @param ByteBuffer $buf
+     * @param $offset
+     * @param $count
+     * @return array
+     */
+    protected static function _parseArray(ByteBuffer $buf, &$offset, $count): array
+    {
         $arr = array();
         for ($i = 0; $i < $count; $i++) {
             $arr[] = self::_parseItem($buf, $offset);

@@ -2,30 +2,35 @@
 
 
 namespace Onetech\WebAuthn\Attestation\Format;
+
 use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\Attestation\AuthenticatorData;
+use stdClass;
 
 
-abstract class FormatBase {
-    protected $_attestationObject = null;
-    protected $_authenticatorData = null;
-    protected $_x5c_chain = array();
+abstract class FormatBase
+{
+    protected ?array $_attestationObject;
+    protected ?AuthenticatorData $_authenticatorData;
+    protected array $_x5c_chain;
     protected $_x5c_tempFile = null;
 
     /**
      *
-     * @param Array $AttestionObject
+     * @param array $AttentionObject
      * @param AuthenticatorData $authenticatorData
      */
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        $this->_attestationObject = $AttestionObject;
+    public function __construct(array $AttentionObject, AuthenticatorData $authenticatorData)
+    {
+        $this->_attestationObject = $AttentionObject;
         $this->_authenticatorData = $authenticatorData;
     }
 
     /**
      *
      */
-    public function __destruct() {
+    public function __destruct()
+    {
         // delete X.509 chain certificate file after use
         if ($this->_x5c_tempFile && \is_file($this->_x5c_tempFile)) {
             \unlink($this->_x5c_tempFile);
@@ -36,7 +41,8 @@ abstract class FormatBase {
      * returns the certificate chain in PEM format
      * @return string|null
      */
-    public function getCertificateChain() {
+    public function getCertificateChain(): ?string
+    {
         if ($this->_x5c_tempFile && \is_file($this->_x5c_tempFile)) {
             return \file_get_contents($this->_x5c_tempFile);
         }
@@ -45,9 +51,10 @@ abstract class FormatBase {
 
     /**
      * returns the key X.509 certificate in PEM format
-     * @return string
+     * @return string|null
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): ?string
+    {
         // need to be overwritten
         return null;
     }
@@ -58,7 +65,8 @@ abstract class FormatBase {
      * @return bool
      * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash)
+    {
         // need to be overwritten
         return false;
     }
@@ -69,7 +77,8 @@ abstract class FormatBase {
      * @return boolean
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas)
+    {
         // need to be overwritten
         return false;
     }
@@ -80,7 +89,8 @@ abstract class FormatBase {
      * @param string $x5c
      * @return string
      */
-    protected function _createCertificatePem($x5c) {
+    protected function _createCertificatePem(string $x5c): string
+    {
         $pem = '-----BEGIN CERTIFICATE-----' . "\n";
         $pem .= \chunk_split(\base64_encode($x5c), 64, "\n");
         $pem .= '-----END CERTIFICATE-----' . "\n";
@@ -91,23 +101,24 @@ abstract class FormatBase {
      * creates a PEM encoded chain file
      * @return string|null
      */
-    protected function _createX5cChainFile() {
+    protected function _createX5cChainFile(): ?string
+    {
         $content = '';
         if (\is_array($this->_x5c_chain) && \count($this->_x5c_chain) > 0) {
             foreach ($this->_x5c_chain as $x5c) {
                 $certInfo = \openssl_x509_parse($this->_createCertificatePem($x5c));
 
-                // check if certificate is self signed
+                // check if certificate is self-signed
                 if (\is_array($certInfo) && \is_array($certInfo['issuer']) && \is_array($certInfo['subject'])) {
                     $selfSigned = false;
 
                     $subjectKeyIdentifier = $certInfo['extensions']['subjectKeyIdentifier'] ?? null;
                     $authorityKeyIdentifier = $certInfo['extensions']['authorityKeyIdentifier'] ?? null;
 
-                    if ($authorityKeyIdentifier && substr($authorityKeyIdentifier, 0, 6) === 'keyid:') {
+                    if ($authorityKeyIdentifier && str_starts_with($authorityKeyIdentifier, 'keyid:')) {
                         $authorityKeyIdentifier = substr($authorityKeyIdentifier, 6);
                     }
-                    if ($subjectKeyIdentifier && substr($subjectKeyIdentifier, 0, 6) === 'keyid:') {
+                    if ($subjectKeyIdentifier && str_starts_with($subjectKeyIdentifier, 'keyid:')) {
                         $subjectKeyIdentifier = substr($subjectKeyIdentifier, 6);
                     }
 
@@ -136,9 +147,10 @@ abstract class FormatBase {
     /**
      * returns the name and openssl key for provided cose number.
      * @param int $coseNumber
-     * @return \stdClass|null
+     * @return stdClass|null
      */
-    protected function _getCoseAlgorithm($coseNumber) {
+    protected function _getCoseAlgorithm(int $coseNumber): ?stdClass
+    {
         // https://www.iana.org/assignments/cose/cose.xhtml#algorithms
         $coseAlgorithms = array(
             array(
@@ -181,7 +193,7 @@ abstract class FormatBase {
 
         foreach ($coseAlgorithms as $coseAlgorithm) {
             if (\in_array($coseNumber, $coseAlgorithm['cose'], true)) {
-                $return = new \stdClass();
+                $return = new stdClass();
                 $return->hash = $coseAlgorithm['hash'];
                 $return->openssl = $coseAlgorithm['openssl'];
                 return $return;

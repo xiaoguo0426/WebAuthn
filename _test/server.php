@@ -34,7 +34,7 @@
  * ------------------------------------------------------------
  */
 
-require_once '../src/WebAuthn.php';
+require_once '../vendor/autoload.php';
 try {
     session_start();
 
@@ -298,7 +298,7 @@ try {
 
     } else if ($fn === 'getStoredDataHtml') {
         $html = '<!DOCTYPE html>' . "\n";
-        $html .= '<html><head><style>tr:nth-child(even){background-color: #f2f2f2;}</style></head>';
+        $html .= '<html lang=""><head><style>tr:nth-child(even){background-color: #f2f2f2;}</style><title>WebAuthn</title></head>';
         $html .= '<body style="font-family:sans-serif">';
         if (isset($_SESSION['registrations']) && is_array($_SESSION['registrations'])) {
             $html .= '<p>There are ' . count($_SESSION['registrations']) . ' registrations in this session:</p>';

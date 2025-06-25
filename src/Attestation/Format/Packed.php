@@ -2,17 +2,23 @@
 
 
 namespace Onetech\WebAuthn\Attestation\Format;
+
 use Onetech\WebAuthn\Attestation\AuthenticatorData;
 use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\Binary\ByteBuffer;
 
-class Packed extends FormatBase {
-    private $_alg;
-    private $_signature;
-    private $_x5c;
+class Packed extends FormatBase
+{
+    private mixed $_alg;
+    private string $_signature;
+    private string $_x5c;
 
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        parent::__construct($AttestionObject, $authenticatorData);
+    /**
+     * @throws WebAuthnException
+     */
+    public function __construct($AttentionObject, AuthenticatorData $authenticatorData)
+    {
+        parent::__construct($AttentionObject, $authenticatorData);
 
         // check packed data
         $attStmt = $this->_attestationObject['attStmt'];
@@ -31,14 +37,14 @@ class Packed extends FormatBase {
         // certificate for validation
         if (\array_key_exists('x5c', $attStmt) && \is_array($attStmt['x5c']) && \count($attStmt['x5c']) > 0) {
 
-            // The attestation certificate attestnCert MUST be the first element in the array
-            $attestnCert = array_shift($attStmt['x5c']);
+            // The attestation certificate attestCert MUST be the first element in the array
+            $attestCert = array_shift($attStmt['x5c']);
 
-            if (!($attestnCert instanceof ByteBuffer)) {
+            if (!($attestCert instanceof ByteBuffer)) {
                 throw new WebAuthnException('invalid x5c certificate', WebAuthnException::INVALID_DATA);
             }
 
-            $this->_x5c = $attestnCert->getBinaryString();
+            $this->_x5c = $attestCert->getBinaryString();
 
             // certificate chain
             foreach ($attStmt['x5c'] as $chain) {
@@ -54,7 +60,8 @@ class Packed extends FormatBase {
      * returns the key certificate in PEM format
      * @return string|null
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): ?string
+    {
         if (!$this->_x5c) {
             return null;
         }
@@ -63,8 +70,11 @@ class Packed extends FormatBase {
 
     /**
      * @param string $clientDataHash
+     * @return bool
+     * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         if ($this->_x5c) {
             return $this->_validateOverX5c($clientDataHash);
         } else {
@@ -78,7 +88,8 @@ class Packed extends FormatBase {
      * @return boolean
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         if (!$this->_x5c) {
             return false;
         }
@@ -101,7 +112,8 @@ class Packed extends FormatBase {
      * @return bool
      * @throws WebAuthnException
      */
-    protected function _validateOverX5c($clientDataHash) {
+    protected function _validateOverX5c(string $clientDataHash): bool
+    {
         $publicKey = \openssl_pkey_get_public($this->getCertificatePem());
 
         if ($publicKey === false) {
@@ -109,7 +121,7 @@ class Packed extends FormatBase {
         }
 
         // Verify that sig is a valid signature over the concatenation of authenticatorData and clientDataHash
-        // using the attestation public key in attestnCert with the algorithm specified in alg.
+        // using the attestation public key in attestCert with the algorithm specified in alg.
         $dataToVerify = $this->_authenticatorData->getBinary();
         $dataToVerify .= $clientDataHash;
 
@@ -123,8 +135,10 @@ class Packed extends FormatBase {
      * validate if self attestation is in use
      * @param string $clientDataHash
      * @return bool
+     * @throws WebAuthnException
      */
-    protected function _validateSelfAttestation($clientDataHash) {
+    protected function _validateSelfAttestation(string $clientDataHash): bool
+    {
         // Verify that sig is a valid signature over the concatenation of authenticatorData and clientDataHash
         // using the credential public key with alg.
         $dataToVerify = $this->_authenticatorData->getBinary();

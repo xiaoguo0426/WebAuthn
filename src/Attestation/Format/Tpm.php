@@ -7,21 +7,24 @@ use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\Binary\ByteBuffer;
 
 class Tpm extends FormatBase {
-    private $_TPM_GENERATED_VALUE = "\xFF\x54\x43\x47";
-    private $_TPM_ST_ATTEST_CERTIFY = "\x80\x17";
-    private $_alg;
-    private $_signature;
+    private string $_TPM_GENERATED_VALUE = "\xFF\x54\x43\x47";
+    private string $_TPM_ST_ATTEST_CERTIFY = "\x80\x17";
+    private int $_alg;
+    private string $_signature;
     private $_pubArea;
-    private $_x5c;
+    private string $_x5c;
 
     /**
      * @var ByteBuffer
      */
-    private $_certInfo;
+    private ByteBuffer $_certInfo;
 
 
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        parent::__construct($AttestionObject, $authenticatorData);
+    /**
+     * @throws WebAuthnException
+     */
+    public function __construct($AttentionObject, AuthenticatorData $authenticatorData) {
+        parent::__construct($AttentionObject, $authenticatorData);
 
         // check packed data
         $attStmt = $this->_attestationObject['attStmt'];
@@ -55,13 +58,13 @@ class Tpm extends FormatBase {
         if (\array_key_exists('x5c', $attStmt) && \is_array($attStmt['x5c']) && \count($attStmt['x5c']) > 0) {
 
             // The attestation certificate attestnCert MUST be the first element in the array
-            $attestnCert = array_shift($attStmt['x5c']);
+            $attestCert = array_shift($attStmt['x5c']);
 
-            if (!($attestnCert instanceof ByteBuffer)) {
+            if (!($attestCert instanceof ByteBuffer)) {
                 throw new WebAuthnException('invalid x5c certificate', WebAuthnException::INVALID_DATA);
             }
 
-            $this->_x5c = $attestnCert->getBinaryString();
+            $this->_x5c = $attestCert->getBinaryString();
 
             // certificate chain
             foreach ($attStmt['x5c'] as $chain) {
@@ -80,7 +83,8 @@ class Tpm extends FormatBase {
      * returns the key certificate in PEM format
      * @return string|null
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): ?string
+    {
         if (!$this->_x5c) {
             return null;
         }
@@ -89,18 +93,22 @@ class Tpm extends FormatBase {
 
     /**
      * @param string $clientDataHash
+     * @return bool
+     * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         return $this->_validateOverX5c($clientDataHash);
     }
 
     /**
      * validates the certificate against root certificates
      * @param array $rootCas
-     * @return boolean
+     * @return bool
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         if (!$this->_x5c) {
             return false;
         }
@@ -123,7 +131,8 @@ class Tpm extends FormatBase {
      * @return bool
      * @throws WebAuthnException
      */
-    protected function _validateOverX5c($clientDataHash) {
+    protected function _validateOverX5c(string $clientDataHash): bool
+    {
         $publicKey = \openssl_pkey_get_public($this->getCertificatePem());
 
         if ($publicKey === false) {
@@ -165,10 +174,12 @@ class Tpm extends FormatBase {
     /**
      * returns next part of ByteBuffer
      * @param ByteBuffer $buffer
-     * @param int $offset
+     * @param $offset
      * @return ByteBuffer
+     * @throws WebAuthnException
      */
-    protected function _tpmReadLengthPrefixed(ByteBuffer $buffer, &$offset) {
+    protected function _tpmReadLengthPrefixed(ByteBuffer $buffer, &$offset): ByteBuffer
+    {
         $len = $buffer->getUint16Val($offset);
         $data = $buffer->getBytes($offset + 2, $len);
         $offset += (2 + $len);

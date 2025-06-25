@@ -2,14 +2,16 @@
 
 
 namespace Onetech\WebAuthn\Attestation\Format;
+
 use Onetech\WebAuthn\Attestation\AuthenticatorData;
-use Onetech\WebAuthn\WebAuthnException;
 
-class None extends FormatBase {
+class None extends FormatBase
+{
 
 
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        parent::__construct($AttestionObject, $authenticatorData);
+    public function __construct($AttentionObject, AuthenticatorData $authenticatorData)
+    {
+        parent::__construct($AttentionObject, $authenticatorData);
     }
 
 
@@ -17,14 +19,17 @@ class None extends FormatBase {
      * returns the key certificate in PEM format
      * @return string
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): ?string
+    {
         return null;
     }
 
     /**
      * @param string $clientDataHash
+     * @return true
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         return true;
     }
 
@@ -33,9 +38,9 @@ class None extends FormatBase {
      * Format 'none' does not contain any ca, so always false.
      * @param array $rootCas
      * @return boolean
-     * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         return false;
     }
 }

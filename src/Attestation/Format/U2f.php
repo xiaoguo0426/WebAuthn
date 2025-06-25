@@ -2,17 +2,23 @@
 
 
 namespace Onetech\WebAuthn\Attestation\Format;
+
 use Onetech\WebAuthn\Attestation\AuthenticatorData;
 use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\Binary\ByteBuffer;
 
-class U2f extends FormatBase {
-    private $_alg = -7;
-    private $_signature;
+class U2f extends FormatBase
+{
+    private int $_alg = -7;
+    private string $_signature;
     private $_x5c;
 
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        parent::__construct($AttestionObject, $authenticatorData);
+    /**
+     * @throws WebAuthnException
+     */
+    public function __construct($AttentionObject, AuthenticatorData $authenticatorData)
+    {
+        parent::__construct($AttentionObject, $authenticatorData);
 
         // check u2f data
         $attStmt = $this->_attestationObject['attStmt'];
@@ -42,7 +48,8 @@ class U2f extends FormatBase {
      * returns the key certificate in PEM format
      * @return string
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): string
+    {
         $pem = '-----BEGIN CERTIFICATE-----' . "\n";
         $pem .= \chunk_split(\base64_encode($this->_x5c), 64, "\n");
         $pem .= '-----END CERTIFICATE-----' . "\n";
@@ -51,8 +58,11 @@ class U2f extends FormatBase {
 
     /**
      * @param string $clientDataHash
+     * @return bool
+     * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         $publicKey = \openssl_pkey_get_public($this->getCertificatePem());
 
         if ($publicKey === false) {
@@ -78,7 +88,8 @@ class U2f extends FormatBase {
      * @return boolean
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         $chainC = $this->_createX5cChainFile();
         if ($chainC) {
             $rootCas[] = $chainC;

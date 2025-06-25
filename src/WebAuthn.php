@@ -3,6 +3,9 @@
 namespace Onetech\WebAuthn;
 
 use Onetech\WebAuthn\Binary\ByteBuffer;
+use Random\RandomException;
+use SodiumException;
+use stdClass;
 
 /**
  * WebAuthn
@@ -11,23 +14,23 @@ use Onetech\WebAuthn\Binary\ByteBuffer;
  */
 class WebAuthn
 {
-    private $_rpName;
-    private $_rpId;
-    private $_rpIdHash;
+    private string $_rpName;
+    private string $_rpId;
+    private string $_rpIdHash;
     private $_challenge;
-    private $_signatureCounter;
+    private ?int $_signatureCounter;
     private $_caFiles;
     private $_formats;
     private $_androidKeyHashes;
 
     /**
      * Initialize a new WebAuthn server
-     * @param string $rpName the relying party name
-     * @param string $rpId the relying party ID = the domain name
+     * @param string $rpName the relying on party name
+     * @param string $rpId the relying on party ID = the domain name
      * @param bool $useBase64UrlEncoding true to use base64 url encoding for binary data in json objects. Default is a RFC 1342-Like serialized string.
      * @throws WebAuthnException
      */
-    public function __construct($rpName, $rpId, $allowedFormats = null, $useBase64UrlEncoding = false)
+    public function __construct(string $rpName, string $rpId, $allowedFormats = null, bool $useBase64UrlEncoding = false)
     {
         $this->_rpName = $rpName;
         $this->_rpId = $rpId;
@@ -61,7 +64,7 @@ class WebAuthn
      * @param string $path file path of / directory with root certificates
      * @param array|null $certFileExtensions if adding a direction, all files with provided extension are added. default: pem, crt, cer, der
      */
-    public function addRootCertificates($path, $certFileExtensions = null)
+    public function addRootCertificates(string $path, ?array $certFileExtensions = null): void
     {
         if (!\is_array($this->_caFiles)) {
             $this->_caFiles = [];
@@ -83,10 +86,10 @@ class WebAuthn
 
     /**
      * add key hashes for android verification
-     * @param array<string> $hashes
+     * @param string[] $hashes
      * @return void
      */
-    public function addAndroidKeyHashes($hashes)
+    public function addAndroidKeyHashes(array $hashes): void
     {
         if (!\is_array($this->_androidKeyHashes)) {
             $this->_androidKeyHashes = [];
@@ -103,7 +106,7 @@ class WebAuthn
      * Returns the generated challenge to save for later validation
      * @return ByteBuffer
      */
-    public function getChallenge()
+    public function getChallenge(): ByteBuffer
     {
         return $this->_challenge;
     }
@@ -126,24 +129,25 @@ class WebAuthn
      *                                             true = required
      *                                             false = preferred
      *                                             string 'required' 'preferred' 'discouraged'
-     * @param bool|null $crossPlatformAttachment true for cross-platform devices (eg. fido usb),
+     * @param null $crossPlatformAttachment true for cross-platform devices (eg. fido usb),
      *                                             false for platform devices (e.g. windows hello, android safetynet),
      *                                             null for both
      * @param array $excludeCredentialIds an array of ids, which are already registered, to prevent re-registration
-     * @return \stdClass
+     * @return stdClass
+     * @throws WebAuthnException|RandomException
      */
-    public function getCreateArgs($userId, $userName, $userDisplayName, $timeout = 20, $requireResidentKey = false, $requireUserVerification = false, $crossPlatformAttachment = null, $excludeCredentialIds = [])
+    public function getCreateArgs(string $userId, string $userName, string $userDisplayName, int $timeout = 20, bool|string $requireResidentKey = false, bool|string $requireUserVerification = false, $crossPlatformAttachment = null, array $excludeCredentialIds = []): stdClass
     {
 
-        $args = new \stdClass();
-        $args->publicKey = new \stdClass();
+        $args = new stdClass();
+        $args->publicKey = new stdClass();
 
-        // relying party
-        $args->publicKey->rp = new \stdClass();
+        // relying on party
+        $args->publicKey->rp = new stdClass();
         $args->publicKey->rp->name = $this->_rpName;
         $args->publicKey->rp->id = $this->_rpId;
 
-        $args->publicKey->authenticatorSelection = new \stdClass();
+        $args->publicKey->authenticatorSelection = new stdClass();
         $args->publicKey->authenticatorSelection->userVerification = 'preferred';
 
         // validate User Verification Requirement
@@ -171,7 +175,7 @@ class WebAuthn
         }
 
         // user
-        $args->publicKey->user = new \stdClass();
+        $args->publicKey->user = new stdClass();
         $args->publicKey->user->id = new ByteBuffer($userId); // binary
         $args->publicKey->user->name = $userName;
         $args->publicKey->user->displayName = $userDisplayName;
@@ -180,7 +184,7 @@ class WebAuthn
         $args->publicKey->pubKeyCredParams = [];
 
         if (function_exists('sodium_crypto_sign_verify_detached') || \in_array('ed25519', \openssl_get_curve_names(), true)) {
-            $tmp = new \stdClass();
+            $tmp = new stdClass();
             $tmp->type = 'public-key';
             $tmp->alg = -8; // EdDSA
             $args->publicKey->pubKeyCredParams[] = $tmp;
@@ -188,14 +192,14 @@ class WebAuthn
         }
 
         if (\in_array('prime256v1', \openssl_get_curve_names(), true)) {
-            $tmp = new \stdClass();
+            $tmp = new stdClass();
             $tmp->type = 'public-key';
             $tmp->alg = -7; // ES256
             $args->publicKey->pubKeyCredParams[] = $tmp;
             unset ($tmp);
         }
 
-        $tmp = new \stdClass();
+        $tmp = new stdClass();
         $tmp->type = 'public-key';
         $tmp->alg = -257; // RS256
         $args->publicKey->pubKeyCredParams[] = $tmp;
@@ -210,7 +214,7 @@ class WebAuthn
         }
 
         $args->publicKey->attestation = \count($this->_formats) === 1 && \in_array('none', $this->_formats) ? 'none' : $attestation;
-        $args->publicKey->extensions = new \stdClass();
+        $args->publicKey->extensions = new stdClass();
         $args->publicKey->extensions->exts = true;
         $args->publicKey->timeout = $timeout * 1000; // microseconds
         $args->publicKey->challenge = $this->_createChallenge(); // binary
@@ -220,7 +224,7 @@ class WebAuthn
 
         if (is_array($excludeCredentialIds)) {
             foreach ($excludeCredentialIds as $id) {
-                $tmp = new \stdClass();
+                $tmp = new stdClass();
                 $tmp->id = $id instanceof ByteBuffer ? $id : new ByteBuffer($id);  // binary
                 $tmp->type = 'public-key';
                 $tmp->transports = array('usb', 'nfc', 'ble', 'hybrid', 'internal');
@@ -248,9 +252,10 @@ class WebAuthn
      *                                             true = required
      *                                             false = preferred
      *                                             string 'required' 'preferred' 'discouraged'
-     * @return \stdClass
+     * @return stdClass
+     * @throws WebAuthnException|RandomException
      */
-    public function getGetArgs($credentialIds = [], $timeout = 20, $allowUsb = true, $allowNfc = true, $allowBle = true, $allowHybrid = true, $allowInternal = true, $requireUserVerification = false)
+    public function getGetArgs(array $credentialIds = [], int $timeout = 20, bool $allowUsb = true, bool $allowNfc = true, bool $allowBle = true, bool $allowHybrid = true, bool $allowInternal = true, bool|string $requireUserVerification = false): stdClass
     {
 
         // validate User Verification Requirement
@@ -262,8 +267,8 @@ class WebAuthn
             $requireUserVerification = 'preferred';
         }
 
-        $args = new \stdClass();
-        $args->publicKey = new \stdClass();
+        $args = new stdClass();
+        $args->publicKey = new stdClass();
         $args->publicKey->timeout = $timeout * 1000; // microseconds
         $args->publicKey->challenge = $this->_createChallenge();  // binary
         $args->publicKey->userVerification = $requireUserVerification;
@@ -273,7 +278,7 @@ class WebAuthn
             $args->publicKey->allowCredentials = [];
 
             foreach ($credentialIds as $id) {
-                $tmp = new \stdClass();
+                $tmp = new stdClass();
                 $tmp->id = $id instanceof ByteBuffer ? $id : new ByteBuffer($id);  // binary
                 $tmp->transports = [];
 
@@ -307,7 +312,7 @@ class WebAuthn
      * returns null if there is no counter
      * @return ?int
      */
-    public function getSignatureCounter()
+    public function getSignatureCounter(): ?int
     {
         return \is_int($this->_signatureCounter) ? $this->_signatureCounter : null;
     }
@@ -316,15 +321,15 @@ class WebAuthn
      * process a create request and returns data to save for future logins
      * @param string $clientDataJSON binary from browser
      * @param string $attestationObject binary from browser
-     * @param string|ByteBuffer $challenge binary used challange
+     * @param string|ByteBuffer $challenge binary used challenge
      * @param bool $requireUserVerification true, if the device must verify user (e.g. by biometric data or pin)
      * @param bool $requireUserPresent false, if the device must NOT check user presence (e.g. by pressing a button)
      * @param bool $failIfRootMismatch false, if there should be no error thrown if root certificate doesn't match
      * @param bool $requireCtsProfileMatch false, if you don't want to check if the device is approved as a Google-certified Android device.
-     * @return \stdClass
+     * @return stdClass
      * @throws WebAuthnException
      */
-    public function processCreate($clientDataJSON, $attestationObject, $challenge, $requireUserVerification = false, $requireUserPresent = true, $failIfRootMismatch = true, $requireCtsProfileMatch = true)
+    public function processCreate(string $clientDataJSON, string $attestationObject, ByteBuffer|string $challenge, bool $requireUserVerification = false, bool $requireUserPresent = true, bool $failIfRootMismatch = true, bool $requireCtsProfileMatch = true): stdClass
     {
         $clientDataHash = \hash('sha256', $clientDataJSON, true);
         $clientData = \json_decode($clientDataJSON);
@@ -333,7 +338,7 @@ class WebAuthn
         // security: https://www.w3.org/TR/webauthn/#registering-a-new-credential
 
         // 2. Let C, the client data claimed as collected during the credential creation,
-        //    be the result of running an implementation-specific JSON parser on JSONtext.
+        //    be the result of running an implementation-specific JSON parser on JSON text.
         if (!\is_object($clientData)) {
             throw new WebAuthnException('invalid client data', WebAuthnException::INVALID_DATA);
         }
@@ -348,7 +353,7 @@ class WebAuthn
             throw new WebAuthnException('invalid challenge', WebAuthnException::INVALID_CHALLENGE);
         }
 
-        // 5. Verify that the value of C.origin matches the Relying Party's origin.
+        // 5. Verify that the value of C.origin matches the Relying on Party's origin.
         if (!\property_exists($clientData, 'origin') || !$this->_checkOrigin($clientData->origin)) {
             throw new WebAuthnException('invalid origin', WebAuthnException::INVALID_ORIGIN);
         }
@@ -385,7 +390,7 @@ class WebAuthn
             throw new WebAuthnException('user not present during authentication', WebAuthnException::USER_PRESENT);
         }
 
-        // 11. If user verification is required for this registration, verify that the User Verified bit of the flags in authData is set.
+        // 11. If user verification is required for this registration, verify that the User Verified A bit of the flags in authData is set.
         $userVerified = $attestationObject->getAuthenticatorData()->getUserVerified();
         if ($requireUserVerification && !$userVerified) {
             throw new WebAuthnException('user not verified during authentication', WebAuthnException::USER_VERIFICATED);
@@ -397,7 +402,7 @@ class WebAuthn
         }
 
         // prepare data to store for future logins
-        $data = new \stdClass();
+        $data = new stdClass();
         $data->rpId = $this->_rpId;
         $data->attestationFormat = $attestationObject->getAttestationFormatName();
         $data->credentialId = $attestationObject->getAuthenticatorData()->getCredentialId();
@@ -423,14 +428,14 @@ class WebAuthn
      * @param string $authenticatorData binary from browser
      * @param string $signature binary from browser
      * @param string $credentialPublicKey string PEM-formated public key from used credentialId
-     * @param string|ByteBuffer $challenge binary from used challange
-     * @param int $prevSignatureCnt signature count value of the last login
+     * @param string|ByteBuffer $challenge binary from used challenge
+     * @param int|null $prevSignatureCnt signature count value of the last login
      * @param bool $requireUserVerification true, if the device must verify user (e.g. by biometric data or pin)
      * @param bool $requireUserPresent true, if the device must check user presence (e.g. by pressing a button)
      * @return boolean true if get is successful
-     * @throws WebAuthnException
+     * @throws WebAuthnException|SodiumException
      */
-    public function processGet($clientDataJSON, $authenticatorData, $signature, $credentialPublicKey, $challenge, $prevSignatureCnt = null, $requireUserVerification = false, $requireUserPresent = true)
+    public function processGet(string $clientDataJSON, string $authenticatorData, string $signature, string $credentialPublicKey, string|ByteBuffer $challenge, ?int $prevSignatureCnt = null, bool $requireUserVerification = false, bool $requireUserPresent = true): bool
     {
         $authenticatorObj = new Attestation\AuthenticatorData($authenticatorData);
         $clientDataHash = \hash('sha256', $clientDataJSON, true);
@@ -451,7 +456,7 @@ class WebAuthn
         //    inappropriate for your use case), look up the corresponding credential public key.
         //    -> TO BE LOOKED UP BY IMPLEMENTATION
 
-        // 5. Let JSONtext be the result of running UTF-8 decode on the value of cData.
+        // 5. Let JSON text be the result of running UTF-8 decode on the value of cData.
         if (!\is_object($clientData)) {
             throw new WebAuthnException('invalid client data', WebAuthnException::INVALID_DATA);
         }
@@ -467,12 +472,12 @@ class WebAuthn
             throw new WebAuthnException('invalid challenge', WebAuthnException::INVALID_CHALLENGE);
         }
 
-        // 9. Verify that the value of C.origin matches the Relying Party's origin.
+        // 9. Verify that the value of C.origin matches the Relying on Party's origin.
         if (!\property_exists($clientData, 'origin') || !$this->_checkOrigin($clientData->origin)) {
             throw new WebAuthnException('invalid origin', WebAuthnException::INVALID_ORIGIN);
         }
 
-        // 11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying Party.
+        // 11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID expected by the Relying on Party.
         if ($authenticatorObj->getRpIdHash() !== $this->_rpIdHash) {
             throw new WebAuthnException('invalid rpId hash', WebAuthnException::INVALID_RELYING_PARTY);
         }
@@ -482,9 +487,9 @@ class WebAuthn
             throw new WebAuthnException('user not present during authentication', WebAuthnException::USER_PRESENT);
         }
 
-        // 13. If user verification is required for this assertion, verify that the User Verified bit of the flags in authData is set.
+        // 13. If user verification is required for this assertion, verify that the User Verified A bit of the flags in authData is set.
         if ($requireUserVerification && !$authenticatorObj->getUserVerified()) {
-            throw new WebAuthnException('user not verificated during authentication', WebAuthnException::USER_VERIFICATED);
+            throw new WebAuthnException('user not verification during authentication', WebAuthnException::USER_VERIFICATED);
         }
 
         // 14. Verify the values of the client extension outputs
@@ -492,8 +497,7 @@ class WebAuthn
 
         // 16. Using the credential public key looked up in step 3, verify that sig is a valid signature
         //     over the binary concatenation of authData and hash.
-        $dataToVerify = '';
-        $dataToVerify .= $authenticatorData;
+        $dataToVerify = $authenticatorData;
         $dataToVerify .= $clientDataHash;
 
         if (!$this->_verifySignature($dataToVerify, $signature, $credentialPublicKey)) {
@@ -525,10 +529,10 @@ class WebAuthn
      * https://fidoalliance.org/metadata/
      * @param string $certFolder Folder path to save the certificates in PEM format.
      * @param bool $deleteCerts delete certificates in the target folder before adding the new ones.
-     * @return int number of cetificates
+     * @return int number of certificates
      * @throws WebAuthnException
      */
-    public function queryFidoMetaDataService($certFolder, $deleteCerts = true)
+    public function queryFidoMetaDataService(string $certFolder, bool $deleteCerts = true): int
     {
         $url = 'https://mds.fidoalliance.org/';
         $raw = null;
@@ -560,7 +564,7 @@ class WebAuthn
 
         if ($deleteCerts) {
             foreach (\scandir($certFolder) as $ca) {
-                if (\substr($ca, -4) === '.pem') {
+                if (str_ends_with($ca, '.pem')) {
                     if (\unlink($certFolder . DIRECTORY_SEPARATOR . $ca) === false) {
                         throw new WebAuthnException('Cannot delete certs in folder for FIDO Alliance Metadata Service');
                     }
@@ -613,11 +617,11 @@ class WebAuthn
     // -----------------------------------------------
 
     /**
-     * checks if the origin matchs the RP ID
+     * checks if the origin matches the RP ID
      * @param string $origin
      * @return boolean
      */
-    private function _checkOrigin($origin)
+    private function _checkOrigin(string $origin): bool
     {
         if (str_starts_with($origin, 'android:apk-key-hash:')) {
             return $this->_checkAndroidKeyHashes($origin);
@@ -644,7 +648,7 @@ class WebAuthn
      * @param string $origin
      * @return boolean
      */
-    private function _checkAndroidKeyHashes($origin)
+    private function _checkAndroidKeyHashes(string $origin): bool
     {
         $parts = explode('android:apk-key-hash:', $origin);
         if (count($parts) !== 2) {
@@ -654,12 +658,13 @@ class WebAuthn
     }
 
     /**
-     * generates a new challange
+     * generates a new challenge
      * @param int $length
      * @return ByteBuffer
      * @throws WebAuthnException
+     * @throws RandomException
      */
-    private function _createChallenge($length = 32)
+    private function _createChallenge(int $length = 32): ByteBuffer
     {
         if (!$this->_challenge) {
             $this->_challenge = ByteBuffer::randomBuffer($length);
@@ -671,11 +676,12 @@ class WebAuthn
      * check if the signature is valid.
      * @param string $dataToVerify
      * @param string $signature
-     * @param string $credentialPublicKey PEM format
+     * @param string $credentialPublicKey
      * @return bool
      * @throws WebAuthnException
+     * @throws SodiumException
      */
-    private function _verifySignature($dataToVerify, $signature, $credentialPublicKey)
+    private function _verifySignature(string $dataToVerify, string $signature, string $credentialPublicKey): bool
     {
 
         // Use Sodium to verify EdDSA 25519 as It's not yet supported by openssl
@@ -687,7 +693,7 @@ class WebAuthn
                 // 30        = der sequence
                 // 2a        = length 42 byte
                 // 30        = der sequence
-                // 05        = lenght 5 byte
+                // 05        = length 5 byte
                 // 06        = der OID
                 // 03        = OID length 3 byte
                 // 2b 65 70  = OID 1.3.101.112 curveEd25519 (EdDSA 25519 signature algorithm)

@@ -2,15 +2,21 @@
 
 
 namespace Onetech\WebAuthn\Attestation\Format;
+
 use Onetech\WebAuthn\Attestation\AuthenticatorData;
 use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\Binary\ByteBuffer;
 
-class Apple extends FormatBase {
-    private $_x5c;
+class Apple extends FormatBase
+{
+    private string $_x5c;
 
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        parent::__construct($AttestionObject, $authenticatorData);
+    /**
+     * @throws WebAuthnException
+     */
+    public function __construct($AttentionObject, AuthenticatorData $authenticatorData)
+    {
+        parent::__construct($AttentionObject, $authenticatorData);
 
         // check packed data
         $attStmt = $this->_attestationObject['attStmt'];
@@ -19,14 +25,14 @@ class Apple extends FormatBase {
         // certificate for validation
         if (\array_key_exists('x5c', $attStmt) && \is_array($attStmt['x5c']) && \count($attStmt['x5c']) > 0) {
 
-            // The attestation certificate attestnCert MUST be the first element in the array
-            $attestnCert = array_shift($attStmt['x5c']);
+            // The attestation certificate attestCert MUST be the first element in the array
+            $attestCert = array_shift($attStmt['x5c']);
 
-            if (!($attestnCert instanceof ByteBuffer)) {
+            if (!($attestCert instanceof ByteBuffer)) {
                 throw new WebAuthnException('invalid x5c certificate', WebAuthnException::INVALID_DATA);
             }
 
-            $this->_x5c = $attestnCert->getBinaryString();
+            $this->_x5c = $attestCert->getBinaryString();
 
             // certificate chain
             foreach ($attStmt['x5c'] as $chain) {
@@ -44,14 +50,18 @@ class Apple extends FormatBase {
      * returns the key certificate in PEM format
      * @return string|null
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): ?string
+    {
         return $this->_createCertificatePem($this->_x5c);
     }
 
     /**
      * @param string $clientDataHash
+     * @return bool
+     * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         return $this->_validateOverX5c($clientDataHash);
     }
 
@@ -61,7 +71,8 @@ class Apple extends FormatBase {
      * @return boolean
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         $chainC = $this->_createX5cChainFile();
         if ($chainC) {
             $rootCas[] = $chainC;
@@ -80,7 +91,8 @@ class Apple extends FormatBase {
      * @return bool
      * @throws WebAuthnException
      */
-    protected function _validateOverX5c($clientDataHash) {
+    protected function _validateOverX5c(string $clientDataHash): bool
+    {
         $publicKey = \openssl_pkey_get_public($this->getCertificatePem());
 
         if ($publicKey === false) {
@@ -116,7 +128,7 @@ class Apple extends FormatBase {
         //     20 — 32 byte following
 
         $asn1Padding = "\x30\x24\xA1\x22\x04\x20";
-        if (substr($nonceExtension, 0, strlen($asn1Padding)) === $asn1Padding) {
+        if (str_starts_with($nonceExtension, $asn1Padding)) {
             $nonceExtension = substr($nonceExtension, strlen($asn1Padding));
         }
 
@@ -129,7 +141,7 @@ class Apple extends FormatBase {
         $authKey = is_array($authKeyData) && array_key_exists('key', $authKeyData) ? $authKeyData['key'] : null;
 
         if ($key === null || $key !== $authKey) {
-            throw new WebAuthnException('credential public key doesn\'t equal the Subject Public Key of credCert', WebAuthnException::INVALID_DATA);
+            throw new WebAuthnException('credential public key does\'t equal the Subject Public Key of credCert', WebAuthnException::INVALID_DATA);
         }
 
         return true;

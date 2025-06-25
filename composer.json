@@ -9,10 +9,11 @@
   "homepage": "https://github.com/onetech/webauthn",
   "license": "MIT",
   "require": {
-    "php": ">=8.0.0",
+    "php": ">=8.2",
     "ext-openssl": "*",
     "ext-mbstring": "*",
-    "ext-curl": "*"
+    "ext-curl": "*",
+    "ext-sodium": "*"
   },
   "autoload": {
     "psr-4": {

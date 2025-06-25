@@ -1,6 +1,8 @@
 <?php
 
 namespace Onetech\WebAuthn\Attestation;
+
+use Onetech\WebAuthn\Attestation\Format\FormatBase;
 use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\CBOR\CborDecoder;
 use Onetech\WebAuthn\Binary\ByteBuffer;
@@ -9,12 +11,17 @@ use Onetech\WebAuthn\Binary\ByteBuffer;
  * @author Lukas Buchs
  * @license https://github.com/lbuchs/WebAuthn/blob/master/LICENSE MIT
  */
-class AttestationObject {
-    private $_authenticatorData;
-    private $_attestationFormat;
-    private $_attestationFormatName;
+class AttestationObject
+{
+    private AuthenticatorData $_authenticatorData;
+    private FormatBase $_attestationFormat;
+    private string $_attestationFormatName;
 
-    public function __construct($binary , $allowedFormats) {
+    /**
+     * @throws WebAuthnException
+     */
+    public function __construct($binary, $allowedFormats)
+    {
         $enc = CborDecoder::decode($binary);
         // validation
         if (!\is_array($enc) || !\array_key_exists('fmt', $enc) || !is_string($enc['fmt'])) {
@@ -34,35 +41,37 @@ class AttestationObject {
 
         // Format ok?
         if (!in_array($this->_attestationFormatName, $allowedFormats)) {
-            throw new WebAuthnException('invalid atttestation format: ' . $this->_attestationFormatName, WebAuthnException::INVALID_DATA);
+            throw new WebAuthnException('invalid attestation format: ' . $this->_attestationFormatName, WebAuthnException::INVALID_DATA);
         }
 
 
-        switch ($this->_attestationFormatName) {
-            case 'android-key': $this->_attestationFormat = new Format\AndroidKey($enc, $this->_authenticatorData); break;
-            case 'android-safetynet': $this->_attestationFormat = new Format\AndroidSafetyNet($enc, $this->_authenticatorData); break;
-            case 'apple': $this->_attestationFormat = new Format\Apple($enc, $this->_authenticatorData); break;
-            case 'fido-u2f': $this->_attestationFormat = new Format\U2f($enc, $this->_authenticatorData); break;
-            case 'none': $this->_attestationFormat = new Format\None($enc, $this->_authenticatorData); break;
-            case 'packed': $this->_attestationFormat = new Format\Packed($enc, $this->_authenticatorData); break;
-            case 'tpm': $this->_attestationFormat = new Format\Tpm($enc, $this->_authenticatorData); break;
-            default: throw new WebAuthnException('invalid attestation format: ' . $enc['fmt'], WebAuthnException::INVALID_DATA);
-        }
+        $this->_attestationFormat = match ($this->_attestationFormatName) {
+            'android-key' => new Format\AndroidKey($enc, $this->_authenticatorData),
+            'android-safetynet' => new Format\AndroidSafetyNet($enc, $this->_authenticatorData),
+            'apple' => new Format\Apple($enc, $this->_authenticatorData),
+            'fido-u2f' => new Format\U2f($enc, $this->_authenticatorData),
+            'none' => new Format\None($enc, $this->_authenticatorData),
+            'packed' => new Format\Packed($enc, $this->_authenticatorData),
+            'tpm' => new Format\Tpm($enc, $this->_authenticatorData),
+            default => throw new WebAuthnException('invalid attestation format: ' . $enc['fmt'], WebAuthnException::INVALID_DATA),
+        };
     }
 
     /**
      * returns the attestation format name
      * @return string
      */
-    public function getAttestationFormatName() {
+    public function getAttestationFormatName(): string
+    {
         return $this->_attestationFormatName;
     }
 
     /**
      * returns the attestation format class
-     * @return Format\FormatBase
+     * @return FormatBase
      */
-    public function getAttestationFormat() {
+    public function getAttestationFormat(): FormatBase
+    {
         return $this->_attestationFormat;
     }
 
@@ -70,7 +79,8 @@ class AttestationObject {
      * returns the attestation public key in PEM format
      * @return AuthenticatorData
      */
-    public function getAuthenticatorData() {
+    public function getAuthenticatorData(): AuthenticatorData
+    {
         return $this->_authenticatorData;
     }
 
@@ -78,7 +88,8 @@ class AttestationObject {
      * returns the certificate chain as PEM
      * @return string|null
      */
-    public function getCertificateChain() {
+    public function getCertificateChain(): ?string
+    {
         return $this->_attestationFormat->getCertificateChain();
     }
 
@@ -86,7 +97,8 @@ class AttestationObject {
      * return the certificate issuer as string
      * @return string
      */
-    public function getCertificateIssuer() {
+    public function getCertificateIssuer(): string
+    {
         $pem = $this->getCertificatePem();
         $issuer = '';
         if ($pem) {
@@ -115,7 +127,8 @@ class AttestationObject {
      * return the certificate subject as string
      * @return string
      */
-    public function getCertificateSubject() {
+    public function getCertificateSubject(): string
+    {
         $pem = $this->getCertificatePem();
         $subject = '';
         if ($pem) {
@@ -144,7 +157,8 @@ class AttestationObject {
      * returns the key certificate in PEM format
      * @return string
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): string
+    {
         return $this->_attestationFormat->getCertificatePem();
     }
 
@@ -154,7 +168,8 @@ class AttestationObject {
      * @return bool
      * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         return $this->_attestationFormat->validateAttestation($clientDataHash);
     }
 
@@ -164,16 +179,18 @@ class AttestationObject {
      * @return boolean
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         return $this->_attestationFormat->validateRootCertificate($rootCas);
     }
 
     /**
      * checks if the RpId-Hash is valid
-     * @param string$rpIdHash
+     * @param string $rpIdHash
      * @return bool
      */
-    public function validateRpIdHash($rpIdHash) {
+    public function validateRpIdHash(string $rpIdHash): bool
+    {
         return $rpIdHash === $this->_authenticatorData->getRpIdHash();
     }
 }

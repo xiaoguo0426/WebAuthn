@@ -1,17 +1,23 @@
 <?php
 
 namespace Onetech\WebAuthn\Attestation\Format;
+
 use Onetech\WebAuthn\Attestation\AuthenticatorData;
 use Onetech\WebAuthn\WebAuthnException;
 use Onetech\WebAuthn\Binary\ByteBuffer;
 
-class AndroidKey extends FormatBase {
-    private $_alg;
-    private $_signature;
+class AndroidKey extends FormatBase
+{
+    private int $_alg;
+    private string $_signature;
     private $_x5c;
 
-    public function __construct($AttestionObject, AuthenticatorData $authenticatorData) {
-        parent::__construct($AttestionObject, $authenticatorData);
+    /**
+     * @throws WebAuthnException
+     */
+    public function __construct($AttentionObject, AuthenticatorData $authenticatorData)
+    {
+        parent::__construct($AttentionObject, $authenticatorData);
 
         // check u2f data
         $attStmt = $this->_attestationObject['attStmt'];
@@ -37,7 +43,7 @@ class AndroidKey extends FormatBase {
         $this->_x5c = $attStmt['x5c'][0]->getBinaryString();
 
         if (count($attStmt['x5c']) > 1) {
-            for ($i=1; $i<count($attStmt['x5c']); $i++) {
+            for ($i = 1; $i < count($attStmt['x5c']); $i++) {
                 $this->_x5c_chain[] = $attStmt['x5c'][$i]->getBinaryString();
             }
             unset ($i);
@@ -49,14 +55,18 @@ class AndroidKey extends FormatBase {
      * returns the key certificate in PEM format
      * @return string
      */
-    public function getCertificatePem() {
+    public function getCertificatePem(): ?string
+    {
         return $this->_createCertificatePem($this->_x5c);
     }
 
     /**
      * @param string $clientDataHash
+     * @return bool
+     * @throws WebAuthnException
      */
-    public function validateAttestation($clientDataHash) {
+    public function validateAttestation(string $clientDataHash): bool
+    {
         $publicKey = \openssl_pkey_get_public($this->getCertificatePem());
 
         if ($publicKey === false) {
@@ -64,7 +74,7 @@ class AndroidKey extends FormatBase {
         }
 
         // Verify that sig is a valid signature over the concatenation of authenticatorData and clientDataHash
-        // using the attestation public key in attestnCert with the algorithm specified in alg.
+        // using the attestation public key in attestCert with the algorithm specified in alg.
         $dataToVerify = $this->_authenticatorData->getBinary();
         $dataToVerify .= $clientDataHash;
 
@@ -77,10 +87,11 @@ class AndroidKey extends FormatBase {
     /**
      * validates the certificate against root certificates
      * @param array $rootCas
-     * @return boolean
+     * @return bool
      * @throws WebAuthnException
      */
-    public function validateRootCertificate($rootCas) {
+    public function validateRootCertificate(array $rootCas): bool
+    {
         $chainC = $this->_createX5cChainFile();
         if ($chainC) {
             $rootCas[] = $chainC;
