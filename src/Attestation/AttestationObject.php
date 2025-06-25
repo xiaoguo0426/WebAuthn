@@ -157,7 +157,7 @@ class AttestationObject
      * returns the key certificate in PEM format
      * @return string
      */
-    public function getCertificatePem(): string
+    public function getCertificatePem(): ?string
     {
         return $this->_attestationFormat->getCertificatePem();
     }

@@ -18,7 +18,7 @@ class WebAuthn
     private string $_rpId;
     private string $_rpIdHash;
     private $_challenge;
-    private ?int $_signatureCounter;
+    private ?int $_signatureCounter = null;
     private $_caFiles;
     private $_formats;
     private $_androidKeyHashes;
