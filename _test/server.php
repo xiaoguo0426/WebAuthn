@@ -111,7 +111,7 @@ try {
 
         // new Instance of the server library.
         // make sure that $rpId is the domain name.
-        $WebAuthn = new lbuchs\WebAuthn\WebAuthn('WebAuthn Library', $rpId, $formats);
+        $WebAuthn = new onetech\WebAuthn\WebAuthn('WebAuthn Library', $rpId, $formats);
 
         // add root certificates to validate new registrations
         if (filter_input(INPUT_GET, 'solo')) {
